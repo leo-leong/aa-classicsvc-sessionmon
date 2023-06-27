@@ -2,44 +2,59 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.ServiceProcess;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace aa_classicsvc_sessionmon
 {
-    partial class SampleSessionLogonService : ServiceBase
+    using DWORD = System.UInt32;
+    using LONG = System.Int32;
+
+    internal enum TOKEN_INFORMATION_CLASS
     {
-        enum TOKEN_INFORMATION_CLASS
-        {
-            TokenUser = 1,
-            TokenGroups,
-            TokenPrivileges,
-            TokenOwner,
-            TokenPrimaryGroup,
-            TokenDefaultDacl,
-            TokenSource,
-            TokenType,
-            TokenImpersonationLevel,
-            TokenStatistics,
-            TokenRestrictedSids,
-            TokenSessionId,
-            TokenGroupsAndPrivileges,
-            TokenSessionReference,
-            TokenSandBoxInert,
-            TokenAuditPolicy,
-            TokenOrigin
-        }
+        TokenUser = 1,
+        TokenGroups,
+        TokenPrivileges,
+        TokenOwner,
+        TokenPrimaryGroup,
+        TokenDefaultDacl,
+        TokenSource,
+        TokenType,
+        TokenImpersonationLevel,
+        TokenStatistics,
+        TokenRestrictedSids,
+        TokenSessionId,
+        TokenGroupsAndPrivileges,
+        TokenSessionReference,
+        TokenSandBoxInert,
+        TokenAuditPolicy,
+        TokenOrigin
+    }
 
-        [DllImport("advapi32.dll", SetLastError = true)]
-        static extern bool GetTokenInformation(
-            IntPtr TokenHandle,
-            TOKEN_INFORMATION_CLASS TokenInformationClass,
-            IntPtr TokenInformation,
-            uint TokenInformationLength,
-            out uint ReturnLength);
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct LUID
+    {
+        internal DWORD LowPart;
+        internal LONG HighPart;
+    }
 
-        [DllImport("wtsapi32.dll", SetLastError = true)]
-        static extern bool WTSQueryUserToken(UInt32 sessionId, out IntPtr Token);
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct TOKEN_STATISTICS
+    {
+        internal LUID TokenId;
+        internal LUID AuthenticationId;
+    }
+
+    internal class NativeAPI
+    {
+        [DllImport("Advapi32.DLL", EntryPoint = "GetTokenInformation", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
+        internal static extern bool GetTokenInformation(IntPtr TokenHandle, Int32 TokenInformationClass, IntPtr TokenInformation, Int32 TokenInformationLength, out Int32 ReturnLength);
+
+        [DllImport("wtsapi32.dll", EntryPoint = "WTSQueryUserToken", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
+        internal static extern bool WTSQueryUserToken(UInt32 SessionId, out IntPtr Token);
+
+        [DllImport("Kernel32.DLL", EntryPoint = "CloseHandle", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
+        internal static extern bool CloseHandle(IntPtr Handle);
+
     }
 }

@@ -46,9 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="NativeAPI.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="NativeAPI.cs" />
     <Compile Include="ProjectInstaller.cs">
       <SubType>Component</SubType>
     </Compile>

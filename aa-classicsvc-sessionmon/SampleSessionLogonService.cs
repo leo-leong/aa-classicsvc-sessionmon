@@ -50,36 +50,49 @@ namespace aa_classicsvc_sessionmon
         // Handle a session change notice
         protected override void OnSessionChange(SessionChangeDescription changeDescription)
         {
+            IntPtr token;
+            Int32 tokeninfolength;
+            TOKEN_STATISTICS tokenstats = new TOKEN_STATISTICS();
+
             switch (changeDescription.Reason)
             {
                 case SessionChangeReason.SessionLogon:
                     eventLog1.WriteEntry("SessionLogon, Session ID: " +
                         changeDescription.SessionId.ToString());
 
-                    IntPtr token = IntPtr.Zero;
-                    if (!WTSQueryUserToken(Convert.ToUInt32(changeDescription.SessionId),
+                    if (NativeAPI.WTSQueryUserToken(Convert.ToUInt32(changeDescription.SessionId),
                         out token))
                     {
-                        eventLog1.WriteEntry("WTSQueryUserToken failed with: " +
-                            Marshal.GetLastWin32Error().ToString());
-                        break;
+                        // first call on GetTokenInformation to get the length of the token info
+                        NativeAPI.GetTokenInformation(token, (Int32)TOKEN_INFORMATION_CLASS.TokenStatistics, IntPtr.Zero, 0, out tokeninfolength);
+
+                        IntPtr tokeninfo = Marshal.AllocHGlobal((IntPtr)tokeninfolength);
+                        if (NativeAPI.GetTokenInformation(token, (Int32)TOKEN_INFORMATION_CLASS.TokenStatistics, tokeninfo, tokeninfolength, out tokeninfolength))
+                        {
+                            // get user LUID within token statistics
+                            tokenstats = ((TOKEN_STATISTICS)(Marshal.PtrToStructure(tokeninfo, tokenstats.GetType())));
+                            eventLog1.WriteEntry("TokenId: " + tokenstats.TokenId.LowPart +
+                                "\tAuthenticationId: " + tokenstats.AuthenticationId.LowPart
+                                );
+
+                            //TODO: acquire user credentials
+
+                        }
+                        else
+                        {
+                            eventLog1.WriteEntry("GetTokenInformation failed with: " +
+                                Marshal.GetLastWin32Error().ToString()
+                                //"\nSecond call GetTokenInformation tokeninfolength: " + tokeninfolength
+                                );
+                        }
+
+                        NativeAPI.CloseHandle(token);
                     }
-
-                    uint tokeninfolength = 0;
-                    // first call on GetTokenInformation to get the length of the token info
-                    GetTokenInformation(token, TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, tokeninfolength, out tokeninfolength);
-
-                    IntPtr TokenInformation = Marshal.AllocHGlobal((IntPtr)tokeninfolength);
-                    if (GetTokenInformation(token, TOKEN_INFORMATION_CLASS.TokenUser, TokenInformation, tokeninfolength, out tokeninfolength))
+                    else
                     {
                         eventLog1.WriteEntry("WTSQueryUserToken failed with: " +
                             Marshal.GetLastWin32Error().ToString());
-                        break;
                     }
-
-                    //TODO: get user LUID within token statistics
-
-                    //TODO: acquire user credentials
 
                     break;
 
