@@ -54,13 +54,13 @@ namespace aa_classicsvc_sessionmon
 
     internal class NativeAPI
     {
-        [DllImport("Advapi32.DLL", EntryPoint = "GetTokenInformation", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
+        [DllImport("Advapi32.DLL", SetLastError = true)]
         internal static extern bool GetTokenInformation(IntPtr TokenHandle, Int32 TokenInformationClass, IntPtr TokenInformation, Int32 TokenInformationLength, out Int32 ReturnLength);
 
-        [DllImport("wtsapi32.dll", EntryPoint = "WTSQueryUserToken", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
+        [DllImport("wtsapi32.dll", SetLastError = true)]
         internal static extern bool WTSQueryUserToken(UInt32 SessionId, out IntPtr Token);
 
-        [DllImport("Kernel32.DLL", EntryPoint = "CloseHandle", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
+        [DllImport("Kernel32.DLL", SetLastError = true)]
         internal static extern bool CloseHandle(IntPtr Handle);
 
         [DllImport("advapi32.dll", SetLastError = true)]
