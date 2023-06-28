@@ -16,6 +16,7 @@
 //WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 //THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using Microsoft.Win32.SafeHandles;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -69,12 +70,12 @@ namespace aa_classicsvc_sessionmon
         // Handle a session change notice
         protected override void OnSessionChange(SessionChangeDescription changeDescription)
         {
-            IntPtr token;
             Int32 tokeninfolength;
             TOKEN_STATISTICS tokenstats = new TOKEN_STATISTICS();
             const int SECPKG_CRED_OUTBOUND = 2;
             CredHandle credhandle = new CredHandle();
             long timestamp;
+            SafeAccessTokenHandle token = null;
 
             switch (changeDescription.Reason)
             {
@@ -82,53 +83,75 @@ namespace aa_classicsvc_sessionmon
                     eventLog1.WriteEntry("SessionLogon, Session ID: " +
                         changeDescription.SessionId.ToString());
 
-                    if (NativeAPI.WTSQueryUserToken(Convert.ToUInt32(changeDescription.SessionId),
-                        out token))
+                    try
                     {
-                        // first call on GetTokenInformation to get the length of the token info
-                        NativeAPI.GetTokenInformation(token, (Int32)TOKEN_INFORMATION_CLASS.TokenStatistics, IntPtr.Zero, 0, out tokeninfolength);
-
-                        IntPtr tokeninfo = Marshal.AllocHGlobal((IntPtr)tokeninfolength);
-                        if (NativeAPI.GetTokenInformation(token, (Int32)TOKEN_INFORMATION_CLASS.TokenStatistics, tokeninfo, tokeninfolength, out tokeninfolength))
+                        if (NativeAPI.WTSQueryUserToken(Convert.ToUInt32(changeDescription.SessionId), out token))
                         {
-                            // get user LUID within token statistics
-                            tokenstats = ((TOKEN_STATISTICS)(Marshal.PtrToStructure(tokeninfo, tokenstats.GetType())));
-                            eventLog1.WriteEntry("TokenId: " + tokenstats.TokenId.LowPart +
-                                "\tAuthenticationId: " + tokenstats.AuthenticationId.LowPart
-                                );
+                            // first call on GetTokenInformation to get the length of the token info
+                            NativeAPI.GetTokenInformation(token, (Int32)TOKEN_INFORMATION_CLASS.TokenStatistics, IntPtr.Zero, 0, out tokeninfolength);
 
-                            // acquire user credentials
-                            if (NativeAPI.ImpersonateLoggedOnUser(token))
-                            {
-                                NativeAPI.AcquireCredentialsHandle(null, "kerberos", SECPKG_CRED_OUTBOUND, 
-                                    IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 
-                                    ref credhandle, out timestamp);
-                                eventLog1.WriteEntry("Call to AcquireCredentialsHandle succeeded.");
-                            }
-                            else
-                            {
-                                eventLog1.WriteEntry("ImpersonateLoggedOnUser failed with: " +
-                                    Marshal.GetLastWin32Error().ToString()
-                                    );
-                            }
+                            IntPtr tokeninfo = Marshal.AllocHGlobal((IntPtr)tokeninfolength);
 
-                            // revert thread's security context
-                            NativeAPI.RevertToSelf();
+                            try
+                            {
+                                if (NativeAPI.GetTokenInformation(token, (Int32)TOKEN_INFORMATION_CLASS.TokenStatistics, tokeninfo, tokeninfolength, out tokeninfolength))
+                                {
+                                    // get user LUID within token statistics
+                                    tokenstats = Marshal.PtrToStructure<TOKEN_STATISTICS>(tokeninfo);
+                                    eventLog1.WriteEntry("TokenId: " + tokenstats.TokenId.LowPart +
+                                        "\tAuthenticationId: " + tokenstats.AuthenticationId.LowPart
+                                        );
+
+                                    // acquire user credentials
+                                    if (NativeAPI.ImpersonateLoggedOnUser(token))
+                                    {
+                                        try
+                                        {
+                                            NativeAPI.AcquireCredentialsHandle(null, "kerberos", SECPKG_CRED_OUTBOUND,
+                                                IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
+                                                out credhandle, out timestamp);
+                                            eventLog1.WriteEntry("Call to AcquireCredentialsHandle succeeded.");
+
+                                            // revert thread's security context
+                                        }
+                                        finally
+                                        {
+                                            NativeAPI.RevertToSelf();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        eventLog1.WriteEntry("ImpersonateLoggedOnUser failed with: " +
+                                            Marshal.GetLastWin32Error().ToString()
+                                            );
+                                    }
+
+
+                                }
+                                else
+                                {
+                                    eventLog1.WriteEntry("GetTokenInformation failed with: " +
+                                        Marshal.GetLastWin32Error().ToString()
+                                        );
+                                }
+                            }
+                            finally
+                            {
+                                if (tokeninfo != IntPtr.Zero)
+                                {
+                                    Marshal.FreeHGlobal(tokeninfo);
+                                }
+                            }
                         }
                         else
                         {
-                            eventLog1.WriteEntry("GetTokenInformation failed with: " +
-                                Marshal.GetLastWin32Error().ToString()
-                                );
+                            eventLog1.WriteEntry("WTSQueryUserToken failed with: " +
+                                Marshal.GetLastWin32Error().ToString());
                         }
-
-                        // release the handle to user's token
-                        NativeAPI.CloseHandle(token);
                     }
-                    else
+                    finally
                     {
-                        eventLog1.WriteEntry("WTSQueryUserToken failed with: " +
-                            Marshal.GetLastWin32Error().ToString());
+                        token?.Close();
                     }
 
                     break;

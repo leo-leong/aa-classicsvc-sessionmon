@@ -16,6 +16,7 @@
 //WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
 //THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using Microsoft.Win32.SafeHandles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -73,16 +74,16 @@ namespace aa_classicsvc_sessionmon
     internal class NativeAPI
     {
         [DllImport("Advapi32.DLL", SetLastError = true)]
-        internal static extern bool GetTokenInformation(IntPtr TokenHandle, Int32 TokenInformationClass, IntPtr TokenInformation, Int32 TokenInformationLength, out Int32 ReturnLength);
+        internal static extern bool GetTokenInformation(SafeAccessTokenHandle TokenHandle, Int32 TokenInformationClass, IntPtr TokenInformation, Int32 TokenInformationLength, out Int32 ReturnLength);
 
         [DllImport("wtsapi32.dll", SetLastError = true)]
-        internal static extern bool WTSQueryUserToken(UInt32 SessionId, out IntPtr Token);
+        internal static extern bool WTSQueryUserToken(UInt32 SessionId, out SafeAccessTokenHandle Token);
 
         [DllImport("Kernel32.DLL", SetLastError = true)]
         internal static extern bool CloseHandle(IntPtr Handle);
 
         [DllImport("advapi32.dll", SetLastError = true)]
-        internal static extern bool ImpersonateLoggedOnUser(IntPtr TokenHandle);
+        internal static extern bool ImpersonateLoggedOnUser(SafeAccessTokenHandle TokenHandle);
 
         [DllImport("advapi32.dll", SetLastError = true)]
         internal static extern bool RevertToSelf();
@@ -96,7 +97,7 @@ namespace aa_classicsvc_sessionmon
             IntPtr AuthData,
             IntPtr KeyCallback,
             IntPtr KeyArgument,
-            ref CredHandle CredentialHandle,
+            out CredHandle CredentialHandle,
             out long TimeStamp);
     }
 }
