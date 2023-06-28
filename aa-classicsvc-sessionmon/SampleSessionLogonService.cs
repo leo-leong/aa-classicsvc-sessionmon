@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.ServiceProcess;
@@ -53,6 +54,9 @@ namespace aa_classicsvc_sessionmon
             IntPtr token;
             Int32 tokeninfolength;
             TOKEN_STATISTICS tokenstats = new TOKEN_STATISTICS();
+            const int SECPKG_CRED_OUTBOUND = 2;
+            CredHandle credhandle = new CredHandle();
+            long timestamp;
 
             switch (changeDescription.Reason)
             {
@@ -75,17 +79,32 @@ namespace aa_classicsvc_sessionmon
                                 "\tAuthenticationId: " + tokenstats.AuthenticationId.LowPart
                                 );
 
-                            //TODO: acquire user credentials
+                            // acquire user credentials
+                            if (NativeAPI.ImpersonateLoggedOnUser(token))
+                            {
+                                NativeAPI.AcquireCredentialsHandle(null, "kerberos", SECPKG_CRED_OUTBOUND, 
+                                    IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 
+                                    ref credhandle, out timestamp);
+                                eventLog1.WriteEntry("Call to AcquireCredentialsHandle succeeded.");
+                            }
+                            else
+                            {
+                                eventLog1.WriteEntry("ImpersonateLoggedOnUser failed with: " +
+                                    Marshal.GetLastWin32Error().ToString()
+                                    );
+                            }
 
+                            // revert thread's security context
+                            NativeAPI.RevertToSelf();
                         }
                         else
                         {
                             eventLog1.WriteEntry("GetTokenInformation failed with: " +
                                 Marshal.GetLastWin32Error().ToString()
-                                //"\nSecond call GetTokenInformation tokeninfolength: " + tokeninfolength
                                 );
                         }
 
+                        // release the handle to user's token
                         NativeAPI.CloseHandle(token);
                     }
                     else

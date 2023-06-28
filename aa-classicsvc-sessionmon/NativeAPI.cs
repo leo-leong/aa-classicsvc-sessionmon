@@ -45,6 +45,13 @@ namespace aa_classicsvc_sessionmon
         internal LUID AuthenticationId;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CredHandle
+    {
+        internal IntPtr HandleHi;
+        internal IntPtr HandleLo;
+    }
+
     internal class NativeAPI
     {
         [DllImport("Advapi32.DLL", EntryPoint = "GetTokenInformation", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
@@ -56,5 +63,22 @@ namespace aa_classicsvc_sessionmon
         [DllImport("Kernel32.DLL", EntryPoint = "CloseHandle", SetLastError = true, CallingConvention = CallingConvention.StdCall)]
         internal static extern bool CloseHandle(IntPtr Handle);
 
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern bool ImpersonateLoggedOnUser(IntPtr TokenHandle);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        internal static extern bool RevertToSelf();
+
+        [DllImport("Secur32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        internal static extern int AcquireCredentialsHandle(
+            string Principal,
+            string Package,
+            int CredentialUse,
+            IntPtr LogonID,
+            IntPtr AuthData,
+            IntPtr KeyCallback,
+            IntPtr KeyArgument,
+            ref CredHandle CredentialHandle,
+            out long TimeStamp);
     }
 }
